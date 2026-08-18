@@ -152,3 +152,8 @@ podman volume export paperless-media  -o media.tar
   reverse proxy in front instead of granting capabilities.
 - **`podman ps` shows nothing?** Check `journalctl --user -u paperless-db -n 50`;
   a wrong or missing `secrets.env` is the usual cause.
+- **`ValueError: Incorrect timezone setting`** means `PAPERLESS_TIME_ZONE` is a
+  legacy tz alias. Debian trixie moved those (`Australia/ACT`, `US/Eastern`, …)
+  into `tzdata-legacy`, which the image does not install, and django checks the
+  name by looking for `/usr/share/zoneinfo/<TZ>`. Use the canonical name —
+  `Australia/Sydney`, not `Australia/ACT`.
