@@ -146,18 +146,81 @@ the release notes before crossing a major version.
 
 ## Backup
 
-The important things are the postgres volume plus the media volume:
+Use paperless' own exporter. It writes every original document plus a
+`manifest.json` with all the metadata (tags, correspondents, dates, types) into
+`export/`, which is self-contained and restorable into a fresh paperless on any
+machine:
 
 ```bash
-# Paperless' own exporter (documents + metadata, restorable anywhere)
-podman exec -it paperless-webserver document_exporter ../export
-
-# or raw volume dumps
-podman volume export paperless-pgdata -o pgdata.tar
-podman volume export paperless-media  -o media.tar
+podman exec paperless-webserver document_exporter ../export --delete --no-progress-bar
 ```
 
-`export/` and `secrets.env` are what you want off-box.
+Unchanged files are skipped and `--delete` prunes documents you have since
+removed, so re-running it is cheap and `export/` stays a current mirror. Note it
+needs room for a second full copy of your documents.
+
+**What to take off the box:** `export/` and `secrets.env`. That is everything —
+`paperless.env` and the units are in git, and the containers are disposable.
+
+### Automating it
+
+Two plain systemd user units — these are *not* quadlet, so they go in
+`~/.config/systemd/user/`, not the quadlet directory:
+
+```bash
+cat > ~/.config/systemd/user/paperless-backup.service <<'EOF'
+[Unit]
+Description=Export paperless documents and metadata
+Requires=paperless-webserver.service
+After=paperless-webserver.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/podman exec paperless-webserver document_exporter ../export --delete --no-progress-bar
+EOF
+
+cat > ~/.config/systemd/user/paperless-backup.timer <<'EOF'
+[Unit]
+Description=Daily paperless export
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+systemctl --user daemon-reload
+systemctl --user enable --now paperless-backup.timer
+systemctl --user start paperless-backup.service   # test it once now
+```
+
+`Persistent=true` catches up on a run missed while the server was off. Point
+restic/rsync/borg at `export/` afterwards.
+
+### Restoring
+
+On a fresh box: follow the install steps above, start the stack, then import into
+the *empty* instance before creating any documents or users:
+
+```bash
+podman exec -it paperless-webserver document_importer ../export
+```
+
+### Raw volume dumps
+
+Only useful as a same-machine snapshot: they restore only into a matching
+postgres/paperless version, and `paperless-pgdata` and `paperless-media` must be
+captured together — the media volume alone is worthless, since all metadata
+lives in the database. Stop everything first so the dump is consistent:
+
+```bash
+systemctl --user stop paperless-webserver paperless-db paperless-broker
+podman volume export paperless-pgdata -o pgdata.tar
+podman volume export paperless-media  -o media.tar
+systemctl --user start paperless-webserver
+```
 
 ## Notes / gotchas
 
