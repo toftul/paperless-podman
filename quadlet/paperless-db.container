@@ -1,0 +1,18 @@
+[Unit]
+Description=Paperless PostgreSQL database
+
+[Container]
+ContainerName=paperless-db
+Image=docker.io/library/postgres:18
+AutoUpdate=registry
+Network=paperless.network
+Volume=paperless-pgdata.volume:/var/lib/postgresql
+Environment=POSTGRES_DB=paperless
+Environment=POSTGRES_USER=paperless
+EnvironmentFile=/home/ivan/containers/paperless/secrets.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

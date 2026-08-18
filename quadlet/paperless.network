@@ -1,0 +1,8 @@
+[Unit]
+Description=Paperless internal network
+
+[Network]
+NetworkName=paperless
+
+[Install]
+WantedBy=default.target

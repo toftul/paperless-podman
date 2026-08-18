@@ -1,0 +1,34 @@
+[Unit]
+Description=Paperless-ngx webserver
+Requires=paperless-db.service paperless-broker.service
+After=paperless-db.service paperless-broker.service
+
+[Container]
+ContainerName=paperless-webserver
+Image=ghcr.io/paperless-ngx/paperless-ngx:latest
+AutoUpdate=registry
+Network=paperless.network
+PublishPort=8000:8000
+
+# Map container uid/gid 1000 (the "paperless" user) to host uid/gid 1000, so
+# the bind-mounted consume/ and export/ folders stay owned by you. User=0 is
+# required because keep-id otherwise starts the container as uid 1000, and the
+# paperless entrypoint needs to be root inside the namespace to set itself up.
+UserNS=keep-id:uid=1000,gid=1000
+User=0
+Group=0
+
+Volume=paperless-data.volume:/usr/src/paperless/data
+Volume=paperless-media.volume:/usr/src/paperless/media
+Volume=/home/ivan/containers/paperless/consume:/usr/src/paperless/consume:z
+Volume=/home/ivan/containers/paperless/export:/usr/src/paperless/export:z
+
+EnvironmentFile=/home/ivan/containers/paperless/paperless.env
+EnvironmentFile=/home/ivan/containers/paperless/secrets.env
+
+[Service]
+Restart=always
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

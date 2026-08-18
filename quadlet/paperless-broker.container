@@ -1,0 +1,15 @@
+[Unit]
+Description=Paperless Valkey broker
+
+[Container]
+ContainerName=paperless-broker
+Image=docker.io/valkey/valkey:9-alpine
+AutoUpdate=registry
+Network=paperless.network
+Volume=paperless-redisdata.volume:/data
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
