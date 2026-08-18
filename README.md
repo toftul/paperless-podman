@@ -10,7 +10,7 @@ Everything lives in `/home/ivan/containers/paperless` on the server.
 
 ```
 /home/ivan/containers/paperless/
-├── quadlet/                        # symlinked into ~/.config/containers/systemd/
+├── quadlet/                        # copy these into ~/.config/containers/systemd/
 │   ├── paperless.network
 │   ├── paperless-{data,media,pgdata,redisdata}.volume
 │   ├── paperless-db.container      # postgres 18
@@ -57,18 +57,18 @@ chmod 600 secrets.env
 Also check `paperless.env` — at minimum `PAPERLESS_URL`, `PAPERLESS_TIME_ZONE`
 and `PAPERLESS_OCR_LANGUAGE`.
 
-### 4. Install the units and start
+### 4. Copy the units in and start
 
 ```bash
-./install.sh
+mkdir -p consume export ~/.config/containers/systemd
+cp quadlet/* ~/.config/containers/systemd/
+systemctl --user daemon-reload
 systemctl --user start paperless-webserver
 ```
 
-`install.sh` creates `consume/` and `export/`, symlinks `quadlet/*` into
-`~/.config/containers/systemd/`, and runs `daemon-reload`. The webserver unit
-pulls in the database and broker, so starting it starts everything. First start
-downloads ~1 GB of images and runs the database migrations — give it a few
-minutes.
+The webserver unit pulls in the database and broker, so starting it starts
+everything. First start downloads ~1 GB of images and runs the database
+migrations — give it a few minutes.
 
 Then open <http://server:8000> and log in with the admin credentials from
 `secrets.env`.
@@ -88,9 +88,19 @@ There is no `enable` step: quadlet units are generated with
 `enable-linger` above is for).
 
 **Changing config:** edit `paperless.env`, then
-`systemctl --user restart paperless-webserver`.
-**Changing a `.container` file:** edit it, then
-`systemctl --user daemon-reload && systemctl --user restart <unit>`.
+`systemctl --user restart paperless-webserver`. No copying needed — the units
+read it at runtime.
+
+**Changing a unit:** edit it here in `quadlet/`, then copy it over again:
+
+```bash
+cp quadlet/paperless-webserver.container ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user restart paperless-webserver
+```
+
+The copies in `~/.config/containers/systemd/` are what systemd actually reads;
+this repo is the master copy. Same after a `git pull`.
 
 **Consuming documents:** copy or `scp` files into `consume/`. Paperless picks
 them up via inotify; subdirectories become tags.
@@ -135,8 +145,9 @@ podman volume export paperless-media  -o media.tar
 - **SELinux.** The two bind mounts use `:z`; AlmaLinux relabels them
   automatically on first start. Nothing else to do — do not disable SELinux.
 - **Paths are absolute** (`/home/ivan/containers/paperless/...`) in the
-  `.container` files, since quadlet resolves symlinked units in a way that makes
-  relative paths unreliable. If you clone elsewhere, `sed -i` them.
+  `.container` files. They have to be: the units run from
+  `~/.config/containers/systemd/`, so a relative path would be resolved against
+  that directory, not this one. If you clone elsewhere, `sed -i` them.
 - **Ports.** Rootless podman can bind 8000 fine. For anything below 1024 put a
   reverse proxy in front instead of granting capabilities.
 - **`podman ps` shows nothing?** Check `journalctl --user -u paperless-db -n 50`;
