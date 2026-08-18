@@ -73,6 +73,32 @@ migrations — give it a few minutes.
 Then open <http://server:8000> and log in with the admin credentials from
 `secrets.env`.
 
+## How documents get in and out
+
+Three separate paths, easy to confuse:
+
+| | what it is | who writes it |
+|---|---|---|
+| web UI upload | the normal way | goes straight into the `paperless-media` volume |
+| `consume/` | an inbox, watched by paperless | you drop files in; paperless ingests and then **deletes** them |
+| `export/` | an outbox | empty until you run `document_exporter` yourself |
+
+So a file uploaded in the browser never appears in `consume/` or `export/` —
+those are only for getting documents in and out without the browser. Everything
+paperless holds lives in the `paperless-media` volume no matter how it arrived:
+
+```bash
+podman exec paperless-webserver ls /usr/src/paperless/media/documents/originals
+```
+
+`consume/` empties itself by design: once a file is ingested the original is
+copied into paperless' own storage and removed from the folder. Watch it happen
+with `journalctl --user -u paperless-webserver -f`.
+
+`PAPERLESS_CONSUMER_POLLING=0` means the folder is watched with inotify, which
+is right for local disk but does **not** fire over NFS or SMB. If `consume/`
+ever becomes a network mount, set `PAPERLESS_CONSUMER_POLLING=60` instead.
+
 ## Day-to-day
 
 ```bash
